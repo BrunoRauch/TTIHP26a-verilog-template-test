@@ -1,6 +1,6 @@
 # Tiny Tapeout project information
 project:
-  title:        "Test Project"      # Project title
+  title:        "Test Project FH"      # Project title
   author:       "Bruno"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "Empty! just test the Tiny Tapeout workflow."      # One line description of what your project does
