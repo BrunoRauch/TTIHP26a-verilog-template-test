@@ -5,6 +5,7 @@
 
 `default_nettype none
 
+`default_nettype none
 module tt_um_workflow_test (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
@@ -13,7 +14,11 @@ module tt_um_workflow_test (
     output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
     input  wire       ena,      // always 1 when the design is powered, so you can ignore it
     input  wire       clk,      // clock
-    input  wire       rst_n     // reset_n - low to reset
+    input  wire       rst_n,    // reset_n - low to reset
+`ifdef USE_POWER_PINS
+    inout wire        VPWR,     // Power supply
+    inout wire        VGND      // Ground
+`endif
 );
 
   wire [6:0] addr = ui_in[6:0];
