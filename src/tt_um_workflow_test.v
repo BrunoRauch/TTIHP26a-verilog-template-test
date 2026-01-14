@@ -16,12 +16,41 @@ module tt_um_workflow_test (
     input  wire       rst_n     // reset_n - low to reset
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  wire [6:0] addr = ui_in[6:0];
+  wire [1:0] byte_index = addr[1:0];
 
-  // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+  assign uio_oe  = 8'b0;  // All bidirectional IOs are inputs
+  assign uio_out = 8'b0;
+
+  wire WE = ui_in[7];
+  wire WE0 = WE && (byte_index == 0);
+  wire WE1 = WE && (byte_index == 1);
+  wire WE2 = WE && (byte_index == 2);
+  wire WE3 = WE && (byte_index == 3);
+
+  wire [4:0] bit_index = {byte_index, 3'b000};
+  wire [31:0] Di0 = {24'b0, uio_in} << bit_index;
+  wire [31:0] Do0;
+  reg [4:0] out_bit_index;
+  assign uo_out = Do0[out_bit_index+:8];
+
+  RAM32 ram1 (
+`ifdef USE_POWER_PINS
+      .VPWR(VPWR),
+      .VGND(VGND),
+`endif
+      .CLK (clk),
+      .EN0 (rst_n),
+      .A0  (addr[6:2]),
+      .WE0 ({WE3, WE2, WE1, WE0}),
+      .Di0 (Di0),
+      .Do0 (Do0)
+  );
+
+  always @(posedge clk) begin
+    if (rst_n) begin
+      out_bit_index <= bit_index;
+    end else out_bit_index <= 0;
+  end
 
 endmodule
