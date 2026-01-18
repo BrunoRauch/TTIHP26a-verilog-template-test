@@ -151,63 +151,49 @@ assign i_rdata1 = 1'b0;
 assign i_ext_ready = 1'b1;
 assign i_ext_rd = 32'h0;
 
-// === XOR ALL SERV SIGNALS TO PREVENT OPTIMIZATION ===
-// This ensures synthesis cannot remove any part of SERV
+// === REGISTERS to capture SERV activity (prevents optimization) ===
+reg [31:0] serv_state_reg1;
+reg [31:0] serv_state_reg2;
+reg [31:0] serv_state_reg3;
 
-// XOR all Wishbone bus signals together
-wire [31:0] wishbone_activity;
-assign wishbone_activity = o_ibus_adr ^ o_dbus_adr ^ o_dbus_dat;
-
-// XOR all register file signals
-wire [7:0] regfile_activity;
-assign regfile_activity = {3'b0, o_wreg0} ^ 
-                          {3'b0, o_wreg1} ^ 
-                          {3'b0, o_rreg0} ^ 
-                          {3'b0, o_rreg1} ^
-                          {7'b0, o_wdata0} ^
-                          {7'b0, o_wdata1} ^
-                          {7'b0, o_wen0} ^
-                          {7'b0, o_wen1};
-
-// XOR all bus control signals
-wire [7:0] bus_control;
-assign bus_control = {4'b0, o_dbus_sel} ^
-                     {7'b0, o_ibus_cyc} ^
-                     {7'b0, o_dbus_cyc} ^
-                     {7'b0, o_dbus_we} ^
-                     {7'b0, o_rf_rreq} ^
-                     {7'b0, o_rf_wreq};
-
-// XOR extension interface signals
-wire [31:0] ext_activity;
-assign ext_activity = o_ext_rs1 ^ o_ext_rs2 ^ 
-                      {29'b0, o_ext_funct3} ^
-                      {31'b0, o_mdu_valid};
-
-// Combine everything into 8-bit outputs
-wire [7:0] serv_activity_byte0;
-wire [7:0] serv_activity_byte1;
-wire [7:0] serv_activity_byte2;
-wire [7:0] serv_activity_byte3;
-
-assign serv_activity_byte0 = wishbone_activity[7:0] ^ regfile_activity;
-assign serv_activity_byte1 = wishbone_activity[15:8] ^ bus_control;
-assign serv_activity_byte2 = wishbone_activity[23:16] ^ ext_activity[7:0];
-assign serv_activity_byte3 = wishbone_activity[31:24] ^ ext_activity[15:8] ^ ext_activity[23:16] ^ ext_activity[31:24];
-
-// Final combined activity signal
-wire [7:0] total_serv_activity;
-assign total_serv_activity = serv_activity_byte0 ^ 
-                             serv_activity_byte1 ^ 
-                             serv_activity_byte2 ^ 
-                             serv_activity_byte3;
+always @(posedge clk) begin
+    if (!rst_n) begin
+        serv_state_reg1 <= 32'h0;
+        serv_state_reg2 <= 32'h0;
+        serv_state_reg3 <= 32'h0;
+    end else begin
+        // Capture all Wishbone bus activity
+        serv_state_reg1 <= o_ibus_adr ^ o_dbus_adr ^ o_dbus_dat;
+        
+        // Capture register file activity
+        serv_state_reg2 <= {27'b0, o_wreg0} ^ 
+                           {27'b0, o_wreg1} ^ 
+                           {27'b0, o_rreg0} ^ 
+                           {27'b0, o_rreg1} ^
+                           {31'b0, o_wdata0} ^
+                           {31'b0, o_wdata1} ^
+                           {31'b0, o_wen0} ^
+                           {31'b0, o_wen1} ^
+                           {28'b0, o_dbus_sel} ^
+                           {31'b0, o_ibus_cyc} ^
+                           {31'b0, o_dbus_cyc} ^
+                           {31'b0, o_dbus_we} ^
+                           {31'b0, o_rf_rreq} ^
+                           {31'b0, o_rf_wreq};
+        
+        // Capture extension interface activity
+        serv_state_reg3 <= o_ext_rs1 ^ o_ext_rs2 ^ 
+                           {29'b0, o_ext_funct3} ^
+                           {31'b0, o_mdu_valid};
+    end
+end
 
 // === OUTPUT ASSIGNMENTS ===
-// Combine RAM output with SERV activity to prevent optimization
-assign uo_out = Do0[out_bit_index+:8] | total_serv_activity;
+// Combine RAM with registered SERV state
+assign uo_out = Do0[out_bit_index+:8] | serv_state_reg1[7:0] | serv_state_reg2[7:0] | serv_state_reg3[7:0];
 
-// Use all bidirectional pins as outputs to show SERV status
-assign uio_oe = 8'b11111111;  // All pins are outputs
-assign uio_out = serv_activity_byte1;  // Show bus control activity
+// Use all bidirectional pins as outputs
+assign uio_oe = 8'b11111111;
+assign uio_out = serv_state_reg1[15:8] ^ serv_state_reg2[15:8] ^ serv_state_reg3[15:8];
 
 endmodule
