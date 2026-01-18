@@ -18,6 +18,16 @@ inout wire        VGND      // Ground
 `endif
 );
 
+// Dummy counter to drive unused SERV inputs
+reg [31:0] dummy_counter;
+
+always @(posedge clk) begin
+    if (!rst_n)
+        dummy_counter <= 32'h0;
+    else
+        dummy_counter <= dummy_counter + 1'b1;
+end
+
 // RAM32 Signals
 wire [6:0] addr = ui_in[6:0];
 wire [1:0] byte_index = addr[1:0];
@@ -98,7 +108,7 @@ serv_top #(
 ) serv_cpu (
     .clk(clk),
     .i_rst(!rst_n),
-    .i_timer_irq(1'b0),
+    .i_timer_irq(dummy_counter[0]),
     
     // Instruction bus (Wishbone-like interface)
     .o_ibus_cyc(o_ibus_cyc),
@@ -146,13 +156,13 @@ assign i_ibus_ack = o_ibus_cyc;
 assign i_dbus_ack = o_dbus_cyc;
 
 // Tie off register file interface
-assign i_rf_ready = 1'b1;
-assign i_rdata0 = 1'b0;
-assign i_rdata1 = 1'b0;
+assign i_rf_ready = dummy_counter[1];
+assign i_rdata0 = dummy_counter[2];
+assign i_rdata1 = dummy_counter[3];
 
 // Tie off extension interface
-assign i_ext_ready = 1'b1;
-assign i_ext_rd = 32'h0;
+assign i_ext_ready = dummy_counter[4];
+assign i_ext_rd = dummy_counter;
 
 // === REGISTERS to capture SERV activity (prevents optimization) ===
 reg [31:0] serv_state_reg1;
