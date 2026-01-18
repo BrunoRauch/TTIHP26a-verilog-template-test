@@ -17,6 +17,8 @@ inout wire        VPWR,     // Power supply
 inout wire        VGND      // Ground
 `endif
 );
+
+// RAM32 Signals
 wire [6:0] addr = ui_in[6:0];
 wire [1:0] byte_index = addr[1:0];
 
@@ -30,6 +32,7 @@ wire [31:0] Di0 = {24'b0, uio_in} << bit_index;
 wire [31:0] Do0;
 reg [4:0] out_bit_index;
 
+// RAM32 Instance
 RAM32 ram1 (
 `ifdef USE_POWER_PINS
       .VPWR(VPWR),
@@ -194,6 +197,8 @@ assign uo_out = Do0[out_bit_index+:8] | serv_state_reg1[7:0] | serv_state_reg2[7
 
 // Use all bidirectional pins as outputs
 assign uio_oe = 8'b11111111;
-assign uio_out = serv_state_reg1[15:8] ^ serv_state_reg2[15:8] ^ serv_state_reg3[15:8];
+assign uio_out = (serv_state_reg1[31:24] ^ serv_state_reg1[23:16] ^ serv_state_reg1[15:8]) ^
+                 (serv_state_reg2[31:24] ^ serv_state_reg1[23:16] ^ serv_state_reg2[15:8]) ^
+                 (serv_state_reg3[31:24] ^ serv_state_reg1[23:16] ^ serv_state_reg3[15:8]);
 
 endmodule
