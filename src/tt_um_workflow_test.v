@@ -208,7 +208,7 @@ assign uo_out = Do0[out_bit_index+:8] | serv_state_reg1[7:0] | serv_state_reg2[7
 // Use all bidirectional pins as outputs
 assign uio_oe = 8'b11111111;
 assign uio_out = (serv_state_reg1[31:24] ^ serv_state_reg1[23:16] ^ serv_state_reg1[15:8]) ^
-                 (serv_state_reg2[31:24] ^ serv_state_reg1[23:16] ^ serv_state_reg2[15:8]) ^
-                 (serv_state_reg3[31:24] ^ serv_state_reg1[23:16] ^ serv_state_reg3[15:8]);
+                 (serv_state_reg2[31:24] ^ serv_state_reg2[23:16] ^ serv_state_reg2[15:8]) ^
+                 (serv_state_reg3[31:24] ^ serv_state_reg3[23:16] ^ serv_state_reg3[15:8]);
 
 endmodule
