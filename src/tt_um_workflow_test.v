@@ -5,7 +5,6 @@
 
 `default_nettype none
 
-`default_nettype none
 module tt_um_workflow_test (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
@@ -57,5 +56,50 @@ module tt_um_workflow_test (
       out_bit_index <= bit_index;
     end else out_bit_index <= 0;
   end
+
+ // === SERV CPU Signals ===
+    wire        o_ibus_cyc;
+    wire [31:0] o_ibus_adr;
+    wire [31:0] i_ibus_rdt;
+    wire        i_ibus_ack;
+    
+    wire        o_dbus_cyc;
+    wire [31:0] o_dbus_adr;
+    wire        o_dbus_we;
+    wire [31:0] o_dbus_wdt;
+    wire  [3:0] o_dbus_sel;
+    wire [31:0] i_dbus_rdt;
+    wire        i_dbus_ack;
+    
+    // === Instantiate SERV CPU (just for size testing) ===
+    serv_top #(
+        .RESET_PC(32'h0000_0000),
+        .WITH_CSR(0),
+        .PRE_REGISTER(1),
+        .MDU(0)
+    ) serv_cpu (
+        .clk(clk),
+        .i_rst(!rst_n),
+        .i_timer_irq(1'b0),
+        .o_ibus_cyc(o_ibus_cyc),
+        .o_ibus_adr(o_ibus_adr),
+        .i_ibus_rdt(i_ibus_rdt),
+        .i_ibus_ack(i_ibus_ack),
+        .o_dbus_cyc(o_dbus_cyc),
+        .o_dbus_adr(o_dbus_adr),
+        .o_dbus_we(o_dbus_we),
+        .o_dbus_wdt(o_dbus_wdt),
+        .o_dbus_sel(o_dbus_sel),
+        .i_dbus_rdt(i_dbus_rdt),
+        .i_dbus_ack(i_dbus_ack)
+    );
+    
+    // Tie off SERV signals (not used in this test)
+    assign i_ibus_rdt = Do0;
+    assign i_dbus_rdt = Do0;
+    assign i_ibus_ack = o_ibus_cyc;
+    assign i_dbus_ack = o_dbus_cyc;
+
+
 
 endmodule
