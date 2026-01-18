@@ -152,22 +152,33 @@ assign i_ext_ready = 1'b1;
 assign i_ext_rd = 32'h0;
 
 // === Connect SERV outputs to prevent optimization ===
-// Create a combined SERV activity signal by XORing key outputs
+// Combine MORE SERV signals to force synthesis to keep everything
 wire [7:0] serv_activity;
 assign serv_activity = o_dbus_adr[7:0] ^ 
                        o_ibus_adr[7:0] ^
+                       o_dbus_dat[7:0] ^      // ADD THIS - data output!
                        {7'b0, o_dbus_cyc} ^ 
                        {7'b0, o_ibus_cyc} ^
                        {4'b0, o_dbus_sel} ^
                        {3'b0, o_wreg0} ^
+                       {3'b0, o_wreg1} ^      // ADD THIS
                        {3'b0, o_rreg0} ^
-                       {7'b0, o_dbus_we};
+                       {3'b0, o_rreg1} ^      // ADD THIS
+                       {7'b0, o_dbus_we} ^
+                       {7'b0, o_wdata0} ^     // ADD THIS
+                       {7'b0, o_wdata1} ^     // ADD THIS
+                       {7'b0, o_wen0} ^       // ADD THIS
+                       {7'b0, o_wen1};        // ADD THIS
 
-// Output: Combine RAM data with SERV activity to prevent optimization
+// Output: Combine RAM data with SERV activity
 assign uo_out = Do0[out_bit_index+:8] | serv_activity;
 
-// Use one bidirectional pin to show SERV is active
-assign uio_oe = 8'b00000001;  // Make uio_out[0] an output
-assign uio_out = {7'b0, (o_dbus_cyc | o_ibus_cyc | o_rf_rreq | o_rf_wreq)};
-
+// Use bidirectional pins to show more SERV activity
+assign uio_oe = 8'b11111111;  // All outputs
+assign uio_out = {o_ext_funct3,           // bits [7:5]
+                  o_mdu_valid,             // bit [4]
+                  o_rf_rreq,               // bit [3]
+                  o_rf_wreq,               // bit [2]
+                  o_dbus_cyc,              // bit [1]
+                  o_ibus_cyc};             // bit [0]
 endmodule
