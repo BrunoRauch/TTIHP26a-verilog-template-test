@@ -86,7 +86,7 @@ wire [31:0] o_ext_rs1;
 wire [31:0] o_ext_rs2;
 wire        o_mdu_valid;
 
-// === Instantiate SERV CPU (just for size testing) ===
+// === Instantiate SERV CPU ===
 serv_top #(
     .RESET_PC(32'h0000_0000),
     .WITH_CSR(0),
@@ -97,13 +97,13 @@ serv_top #(
     .i_rst(!rst_n),
     .i_timer_irq(1'b0),
     
-    // Instruction bus
+    // Instruction bus (Wishbone-like interface)
     .o_ibus_cyc(o_ibus_cyc),
     .o_ibus_adr(o_ibus_adr),
     .i_ibus_rdt(i_ibus_rdt),
     .i_ibus_ack(i_ibus_ack),
     
-    // Data bus
+    // Data bus (Wishbone-like interface)
     .o_dbus_cyc(o_dbus_cyc),
     .o_dbus_adr(o_dbus_adr),
     .o_dbus_we(o_dbus_we),
@@ -136,7 +136,7 @@ serv_top #(
     .o_mdu_valid(o_mdu_valid)
 );
 
-// Tie off SERV signals
+// Connect SERV Wishbone buses to RAM
 assign i_ibus_rdt = Do0;
 assign i_dbus_rdt = Do0;
 assign i_ibus_ack = o_ibus_cyc;
@@ -151,34 +151,63 @@ assign i_rdata1 = 1'b0;
 assign i_ext_ready = 1'b1;
 assign i_ext_rd = 32'h0;
 
-// === Connect SERV outputs to prevent optimization ===
-// Combine MORE SERV signals to force synthesis to keep everything
-wire [7:0] serv_activity;
-assign serv_activity = o_dbus_adr[7:0] ^ 
-                       o_ibus_adr[7:0] ^
-                       o_dbus_dat[7:0] ^      // ADD THIS - data output!
-                       {7'b0, o_dbus_cyc} ^ 
-                       {7'b0, o_ibus_cyc} ^
-                       {4'b0, o_dbus_sel} ^
-                       {3'b0, o_wreg0} ^
-                       {3'b0, o_wreg1} ^      // ADD THIS
-                       {3'b0, o_rreg0} ^
-                       {3'b0, o_rreg1} ^      // ADD THIS
-                       {7'b0, o_dbus_we} ^
-                       {7'b0, o_wdata0} ^     // ADD THIS
-                       {7'b0, o_wdata1} ^     // ADD THIS
-                       {7'b0, o_wen0} ^       // ADD THIS
-                       {7'b0, o_wen1};        // ADD THIS
+// === XOR ALL SERV SIGNALS TO PREVENT OPTIMIZATION ===
+// This ensures synthesis cannot remove any part of SERV
 
-// Output: Combine RAM data with SERV activity
-assign uo_out = Do0[out_bit_index+:8] | serv_activity;
+// XOR all Wishbone bus signals together
+wire [31:0] wishbone_activity;
+assign wishbone_activity = o_ibus_adr ^ o_dbus_adr ^ o_dbus_dat;
 
-// Use bidirectional pins to show more SERV activity
-assign uio_oe = 8'b11111111;  // All outputs
-assign uio_out = {o_ext_funct3,           // bits [7:5]
-                  o_mdu_valid,             // bit [4]
-                  o_rf_rreq,               // bit [3]
-                  o_rf_wreq,               // bit [2]
-                  o_dbus_cyc,              // bit [1]
-                  o_ibus_cyc};             // bit [0]
+// XOR all register file signals
+wire [7:0] regfile_activity;
+assign regfile_activity = {3'b0, o_wreg0} ^ 
+                          {3'b0, o_wreg1} ^ 
+                          {3'b0, o_rreg0} ^ 
+                          {3'b0, o_rreg1} ^
+                          {7'b0, o_wdata0} ^
+                          {7'b0, o_wdata1} ^
+                          {7'b0, o_wen0} ^
+                          {7'b0, o_wen1};
+
+// XOR all bus control signals
+wire [7:0] bus_control;
+assign bus_control = {4'b0, o_dbus_sel} ^
+                     {7'b0, o_ibus_cyc} ^
+                     {7'b0, o_dbus_cyc} ^
+                     {7'b0, o_dbus_we} ^
+                     {7'b0, o_rf_rreq} ^
+                     {7'b0, o_rf_wreq};
+
+// XOR extension interface signals
+wire [31:0] ext_activity;
+assign ext_activity = o_ext_rs1 ^ o_ext_rs2 ^ 
+                      {29'b0, o_ext_funct3} ^
+                      {31'b0, o_mdu_valid};
+
+// Combine everything into 8-bit outputs
+wire [7:0] serv_activity_byte0;
+wire [7:0] serv_activity_byte1;
+wire [7:0] serv_activity_byte2;
+wire [7:0] serv_activity_byte3;
+
+assign serv_activity_byte0 = wishbone_activity[7:0] ^ regfile_activity;
+assign serv_activity_byte1 = wishbone_activity[15:8] ^ bus_control;
+assign serv_activity_byte2 = wishbone_activity[23:16] ^ ext_activity[7:0];
+assign serv_activity_byte3 = wishbone_activity[31:24] ^ ext_activity[15:8] ^ ext_activity[23:16] ^ ext_activity[31:24];
+
+// Final combined activity signal
+wire [7:0] total_serv_activity;
+assign total_serv_activity = serv_activity_byte0 ^ 
+                             serv_activity_byte1 ^ 
+                             serv_activity_byte2 ^ 
+                             serv_activity_byte3;
+
+// === OUTPUT ASSIGNMENTS ===
+// Combine RAM output with SERV activity to prevent optimization
+assign uo_out = Do0[out_bit_index+:8] | total_serv_activity;
+
+// Use all bidirectional pins as outputs to show SERV status
+assign uio_oe = 8'b11111111;  // All pins are outputs
+assign uio_out = serv_activity_byte1;  // Show bus control activity
+
 endmodule
